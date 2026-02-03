@@ -1,0 +1,20 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+
+export function useTraces(params?: { offset?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ["traces", params],
+    queryFn: () => api.traces.list(params),
+    refetchInterval: 5000,
+  });
+}
+
+export function useTrace(id: string) {
+  return useQuery({
+    queryKey: ["trace", id],
+    queryFn: () => api.traces.get(id),
+    enabled: !!id,
+  });
+}
