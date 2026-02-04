@@ -5,14 +5,19 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
-from typing import Sequence
+from datetime import UTC
+from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from vigil_server.exceptions import VigilError
 from vigil_server.models.drift import DriftAlert
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 from vigil_server.models.span import Span as SpanModel
 
 logger = logging.getLogger("vigil_server.services.drift")
@@ -56,7 +61,7 @@ def compute_psi(baseline: list[float], current: list[float], bins: int = 10) -> 
     current_pct = histogram(current)
 
     psi = 0.0
-    for b, c in zip(baseline_pct, current_pct):
+    for b, c in zip(baseline_pct, current_pct, strict=True):
         psi += (c - b) * math.log(c / b)
 
     return psi
@@ -81,9 +86,9 @@ async def detect_drift(
 
     Groups spans by kind and compares latency distributions.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     baseline_start = now - timedelta(hours=baseline_window_hours)
     current_start = now - timedelta(hours=current_window_hours)
 
@@ -97,9 +102,9 @@ async def detect_drift(
 
         result = await session.execute(stmt)
         rows = result.all()
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error querying spans for drift detection")
-        raise VigilError("Failed to query spans for drift detection", status_code=500)
+        raise VigilError("Failed to query spans for drift detection", status_code=500) from exc
 
     # Group latencies by kind and window
     baseline_latencies: dict[str, list[float]] = defaultdict(list)
@@ -144,9 +149,9 @@ async def detect_drift(
 
     try:
         await session.flush()
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error saving drift alerts")
-        raise VigilError("Failed to save drift alerts", status_code=500)
+        raise VigilError("Failed to save drift alerts", status_code=500) from exc
 
     logger.debug("Drift detection found %d alerts for project %s", len(alerts), project_id)
     return alerts
@@ -169,9 +174,9 @@ async def get_drift_alerts(
 
         result = await session.execute(stmt)
         return result.scalars().all()
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error fetching drift alerts")
-        raise VigilError("Failed to fetch drift alerts", status_code=500)
+        raise VigilError("Failed to fetch drift alerts", status_code=500) from exc
 
 
 async def get_drift_summary(

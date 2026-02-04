@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, Sequence
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from vigil_server.exceptions import NotFoundError, VigilError
 from vigil_server.models.span import Span as SpanModel
 from vigil_server.models.trace import Trace as TraceModel
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 from vigil_server.schemas.traces import IngestRequest, SpanResponse, TraceResponse
 
 logger = logging.getLogger("vigil_server.services.trace")
@@ -25,7 +30,11 @@ async def ingest_spans(
 ) -> tuple[str, int]:
     """Ingest a batch of spans, creating or updating the parent trace."""
     # Determine trace_id from first span or generate new
-    trace_id = request.spans[0].trace_id if request.spans and request.spans[0].trace_id else uuid.uuid4().hex
+    trace_id = (
+        request.spans[0].trace_id
+        if request.spans and request.spans[0].trace_id
+        else uuid.uuid4().hex
+    )
 
     try:
         # Upsert trace
@@ -36,6 +45,7 @@ async def ingest_spans(
                 project_id=project_id or request.project_id or "default",
                 name=request.trace_name,
                 metadata_=request.trace_metadata,
+                external_id=request.external_id,
             )
             session.add(trace)
         else:
@@ -64,18 +74,18 @@ async def ingest_spans(
         logger.debug("Ingested %d spans for trace %s", len(request.spans), trace_id)
         return trace_id, len(request.spans)
 
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error during span ingestion for trace %s", trace_id)
-        raise VigilError("Failed to ingest spans", status_code=500)
+        raise VigilError("Failed to ingest spans", status_code=500) from exc
 
 
 async def get_trace(session: AsyncSession, trace_id: str) -> TraceModel | None:
     """Fetch a trace with all its spans."""
     try:
         return await session.get(TraceModel, trace_id)
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error fetching trace %s", trace_id)
-        raise VigilError("Failed to fetch trace", status_code=500)
+        raise VigilError("Failed to fetch trace", status_code=500) from exc
 
 
 async def list_traces(
@@ -83,8 +93,11 @@ async def list_traces(
     project_id: str | None = None,
     offset: int = 0,
     limit: int = 50,
+    status: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
 ) -> tuple[Sequence[TraceModel], int]:
-    """List traces with pagination."""
+    """List traces with pagination and optional filters."""
     try:
         stmt = select(TraceModel).order_by(TraceModel.created_at.desc())
         count_stmt = select(func.count()).select_from(TraceModel)
@@ -92,6 +105,18 @@ async def list_traces(
         if project_id:
             stmt = stmt.where(TraceModel.project_id == project_id)
             count_stmt = count_stmt.where(TraceModel.project_id == project_id)
+
+        if status:
+            stmt = stmt.where(TraceModel.status == status)
+            count_stmt = count_stmt.where(TraceModel.status == status)
+
+        if start_date:
+            stmt = stmt.where(TraceModel.created_at >= start_date)
+            count_stmt = count_stmt.where(TraceModel.created_at >= start_date)
+
+        if end_date:
+            stmt = stmt.where(TraceModel.created_at <= end_date)
+            count_stmt = count_stmt.where(TraceModel.created_at <= end_date)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -102,9 +127,74 @@ async def list_traces(
 
         return traces, total
 
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error listing traces")
-        raise VigilError("Failed to list traces", status_code=500)
+        raise VigilError("Failed to list traces", status_code=500) from exc
+
+
+async def append_event(
+    session: AsyncSession,
+    trace_id: str,
+    span_id: str,
+    event_name: str,
+    attributes: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Append an event to a specific span within a trace."""
+    try:
+        trace = await session.get(TraceModel, trace_id)
+        if not trace:
+            raise NotFoundError("Trace", trace_id)
+
+        target_span = None
+        for s in trace.spans:
+            if s.id == span_id:
+                target_span = s
+                break
+
+        if not target_span:
+            raise NotFoundError("Span", span_id)
+
+        event = {
+            "name": event_name,
+            "timestamp": datetime.now().isoformat(),
+            "attributes": attributes or {},
+        }
+        current_events = list(target_span.events or [])
+        current_events.append(event)
+        target_span.events = current_events
+        await session.flush()
+        return event
+
+    except SQLAlchemyError as exc:
+        logger.exception("Database error appending event to trace %s", trace_id)
+        raise VigilError("Failed to append event", status_code=500) from exc
+
+
+async def update_trace(
+    session: AsyncSession,
+    trace_id: str,
+    status: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> TraceModel:
+    """Update a trace's status and/or metadata."""
+    try:
+        trace = await session.get(TraceModel, trace_id)
+        if not trace:
+            raise NotFoundError("Trace", trace_id)
+
+        if status is not None:
+            trace.status = status
+        if metadata is not None:
+            current = dict(trace.metadata_ or {})
+            current.update(metadata)
+            trace.metadata_ = current
+
+        await session.flush()
+        return trace
+
+    except SQLAlchemyError as exc:
+        logger.exception("Database error updating trace %s", trace_id)
+        raise VigilError("Failed to update trace", status_code=500) from exc
 
 
 def build_trace_response(trace: TraceModel) -> TraceResponse:
@@ -132,6 +222,7 @@ def build_trace_response(trace: TraceModel) -> TraceResponse:
         project_id=trace.project_id,
         name=trace.name,
         status=trace.status,
+        external_id=trace.external_id,
         metadata=trace.metadata_ or {},
         start_time=trace.start_time,
         end_time=trace.end_time,

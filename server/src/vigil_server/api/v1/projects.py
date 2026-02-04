@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 
-from vigil_server.dependencies import DBSession
+from vigil_server.dependencies import CurrentProject, DBSession  # noqa: TC001
 from vigil_server.models.project import APIKey, Project
 from vigil_server.schemas.projects import ProjectCreate, ProjectListResponse, ProjectResponse
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 async def create_project(
     body: ProjectCreate,
     db: DBSession,
+    _project_id: CurrentProject,
 ) -> ProjectResponse:
     """Create a new project with an initial API key."""
     project = Project(name=body.name, description=body.description)
@@ -32,7 +33,7 @@ async def create_project(
 
 
 @router.get("")
-async def list_projects(db: DBSession) -> ProjectListResponse:
+async def list_projects(db: DBSession, _project_id: CurrentProject) -> ProjectListResponse:
     """List all projects."""
     count_result = await db.execute(select(func.count()).select_from(Project))
     total = count_result.scalar() or 0
@@ -47,7 +48,7 @@ async def list_projects(db: DBSession) -> ProjectListResponse:
 
 
 @router.get("/{project_id}")
-async def get_project(project_id: str, db: DBSession) -> ProjectResponse:
+async def get_project(project_id: str, db: DBSession, _auth: CurrentProject) -> ProjectResponse:
     """Get a project by ID."""
     project = await db.get(Project, project_id)
     if not project:
@@ -59,6 +60,7 @@ async def get_project(project_id: str, db: DBSession) -> ProjectResponse:
 async def rotate_api_key(
     project_id: str,
     db: DBSession,
+    _auth: CurrentProject,
 ) -> dict[str, str]:
     """Deactivate all existing keys and create a new one."""
     project = await db.get(Project, project_id)

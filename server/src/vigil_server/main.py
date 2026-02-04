@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ from vigil_server.config import settings
 from vigil_server.db.session import engine
 from vigil_server.exceptions import register_error_handlers
 from vigil_server.logging_config import configure_logging
+from vigil_server.middleware.rate_limit import RateLimitMiddleware
 from vigil_server.middleware.request_id import RequestIDMiddleware
 
 logger = logging.getLogger("vigil_server")
@@ -53,13 +54,14 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
 
     # Middleware (order matters — outermost first)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
 
     # Routes

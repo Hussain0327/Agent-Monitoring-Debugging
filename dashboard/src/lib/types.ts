@@ -74,3 +74,30 @@ export interface SpanListResponse {
   offset: number;
   limit: number;
 }
+
+export interface ReplayRun {
+  id: string;
+  original_trace_id: string;
+  status: string;
+  created_by: string | null;
+  config: Record<string, unknown>;
+  result_trace_id: string | null;
+  created_at: string;
+}
+
+export interface ReplayDiff {
+  original_trace_id: string;
+  mutations: Record<string, unknown>;
+  diffs: Array<{
+    span_id: string;
+    span_name: string;
+    original_input: Record<string, unknown>;
+    mutated_input: Record<string, unknown>;
+    original_output: Record<string, unknown> | null;
+    note: string;
+  }>;
+}
+
+export interface ReplayConfig {
+  mutations: Record<string, Record<string, unknown>>;
+}

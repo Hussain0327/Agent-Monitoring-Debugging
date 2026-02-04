@@ -35,6 +35,13 @@ class Settings(BaseSettings):
 
     # Auth
     api_key: str = _DEFAULT_API_KEY
+    jwt_secret: str = "dev-jwt-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
+
+    # Rate limiting
+    rate_limit_requests: int = 100
+    rate_limit_window_seconds: int = 60
 
     @property
     def is_sqlite(self) -> bool:
@@ -58,10 +65,26 @@ class Settings(BaseSettings):
                 "Set VIGIL_API_KEY to a secure value."
             )
         logger.warning(
-            "Using default API key — do NOT use in production. "
-            "Set VIGIL_API_KEY to a secure value."
+            "Using default API key — do NOT use in production. Set VIGIL_API_KEY to a secure value."
+        )
+
+    def check_jwt_secret_security(self) -> None:
+        """Warn or raise if the default JWT secret is used in production."""
+        if self.jwt_secret != "dev-jwt-secret-change-me":
+            return
+
+        env = os.getenv("VIGIL_ENV", "development")
+        if env != "development":
+            raise ValueError(
+                "Default JWT secret must not be used in production. "
+                "Set VIGIL_JWT_SECRET to a secure value."
+            )
+        logger.warning(
+            "Using default JWT secret — do NOT use in production. "
+            "Set VIGIL_JWT_SECRET to a secure value."
         )
 
 
 settings = Settings()
 settings.check_api_key_security()
+settings.check_jwt_secret_security()

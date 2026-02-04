@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, AlertTriangle, LayoutDashboard } from "lucide-react";
+import { Activity, AlertTriangle, LayoutDashboard, List, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/traces", label: "Traces", icon: List },
   { href: "/drift", label: "Drift", icon: AlertTriangle },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -47,8 +50,14 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-[var(--border)] px-4 py-3 text-xs text-[var(--muted-foreground)]">
-        Vigil v0.1.0
+      <div className="border-t border-[var(--border)] px-4 py-3">
+        <button
+          onClick={logout}
+          className="w-full rounded-md px-3 py-1.5 text-xs text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)]"
+        >
+          Sign out
+        </button>
+        <div className="mt-2 text-xs text-[var(--muted-foreground)]">Vigil v0.1.0</div>
       </div>
     </aside>
   );

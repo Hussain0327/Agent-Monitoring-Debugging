@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import copy
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from vigil_server.exceptions import NotFoundError, VigilError
+from vigil_server.models.replay import ReplayRun
 from vigil_server.models.trace import Trace as TraceModel
+from vigil_server.schemas.replay import ReplayDiffResponse
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("vigil_server.services.replay")
 
@@ -23,18 +27,23 @@ class ReplayResult:
         original_trace_id: str,
         mutations: dict[str, Any],
         diffs: list[dict[str, Any]],
+        replay_run_id: str | None = None,
     ) -> None:
         self.original_trace_id = original_trace_id
         self.mutations = mutations
         self.diffs = diffs
+        self.replay_run_id = replay_run_id
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the replay result to a dictionary."""
-        return {
+        result: dict[str, Any] = {
             "original_trace_id": self.original_trace_id,
             "mutations": self.mutations,
             "diffs": self.diffs,
         }
+        if self.replay_run_id:
+            result["replay_run_id"] = self.replay_run_id
+        return result
 
 
 async def replay_trace(
@@ -44,22 +53,13 @@ async def replay_trace(
 ) -> ReplayResult:
     """Load a trace, apply mutations to span inputs, and compute output diffs.
 
-    Args:
-        session: Database session.
-        trace_id: ID of the trace to replay.
-        mutations: Dict mapping span_id -> {field: new_value} for input overrides.
-
-    Returns:
-        ReplayResult with original trace, mutations applied, and diffs.
-
-    Raises:
-        NotFoundError: If the trace does not exist.
+    Persists a ReplayRun record for each replay execution.
     """
     try:
         trace = await session.get(TraceModel, trace_id)
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         logger.exception("Database error loading trace %s for replay", trace_id)
-        raise VigilError("Failed to load trace for replay", status_code=500)
+        raise VigilError("Failed to load trace for replay", status_code=500) from exc
 
     if not trace:
         raise NotFoundError("Trace", trace_id)
@@ -71,18 +71,57 @@ async def replay_trace(
         if span.id in mutations:
             original_input = copy.deepcopy(span.input) or {}
             mutated_input = {**original_input, **mutations[span.id]}
-            diffs.append({
-                "span_id": span.id,
-                "span_name": span.name,
-                "original_input": original_input,
-                "mutated_input": mutated_input,
-                "original_output": span.output,
-                "note": "Replay would re-execute this span with mutated input",
-            })
+            diffs.append(
+                {
+                    "span_id": span.id,
+                    "span_name": span.name,
+                    "original_input": original_input,
+                    "mutated_input": mutated_input,
+                    "original_output": span.output,
+                    "note": "Replay would re-execute this span with mutated input",
+                }
+            )
 
-    logger.debug("Replayed trace %s with %d mutations", trace_id, len(mutations))
+    # Persist replay run
+    replay_run = ReplayRun(
+        original_trace_id=trace_id,
+        status="completed",
+        config={"mutations": mutations, "diffs": diffs},
+    )
+    session.add(replay_run)
+    await session.flush()
+
+    logger.debug(
+        "Replayed trace %s with %d mutations (run=%s)", trace_id, len(mutations), replay_run.id
+    )
     return ReplayResult(
         original_trace_id=trace_id,
         mutations=mutations,
         diffs=diffs,
+        replay_run_id=replay_run.id,
+    )
+
+
+async def get_replay_run(session: AsyncSession, replay_id: str) -> ReplayRun | None:
+    """Fetch a replay run by ID."""
+    try:
+        return await session.get(ReplayRun, replay_id)
+    except SQLAlchemyError as exc:
+        logger.exception("Database error fetching replay run %s", replay_id)
+        raise VigilError("Failed to fetch replay run", status_code=500) from exc
+
+
+async def get_replay_diff(
+    session: AsyncSession, trace_id: str, replay_id: str
+) -> ReplayDiffResponse | None:
+    """Fetch the diff from a completed replay run."""
+    run = await get_replay_run(session, replay_id)
+    if not run or run.original_trace_id != trace_id:
+        return None
+
+    config = run.config or {}
+    return ReplayDiffResponse(
+        original_trace_id=run.original_trace_id,
+        mutations=config.get("mutations", {}),
+        diffs=config.get("diffs", []),
     )

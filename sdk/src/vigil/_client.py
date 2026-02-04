@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import threading
 from typing import Any
@@ -73,11 +72,16 @@ class VigilClient:
         set_current_trace(trace)
         return trace
 
-    def end_trace(self, trace: Trace | None = None) -> None:
-        """End a trace and clear it from the context."""
+    def end_trace(self, trace: Trace | None = None, *, success: bool = True) -> None:
+        """End a trace and clear it from the context.
+
+        When ``success`` is False the trace status is set to ``"error"``.
+        """
         t = trace or get_current_trace()
         if t:
             t.end()
+            if not success:
+                t.status = "error"
             set_current_trace(None)
 
     def start_span(

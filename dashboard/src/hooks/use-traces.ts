@@ -3,7 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export function useTraces(params?: { offset?: number; limit?: number }) {
+export function useTraces(params?: {
+  offset?: number;
+  limit?: number;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
   return useQuery({
     queryKey: ["traces", params],
     queryFn: () => api.traces.list(params),

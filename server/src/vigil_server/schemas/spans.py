@@ -28,7 +28,7 @@ class SpanResponse(BaseModel):
 
 class SpanTreeNode(BaseModel):
     span: SpanResponse
-    children: list["SpanTreeNode"] = Field(default_factory=list)
+    children: list[SpanTreeNode] = Field(default_factory=list)
 
 
 class SpanListResponse(BaseModel):

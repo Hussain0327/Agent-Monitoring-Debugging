@@ -1,4 +1,4 @@
-.PHONY: dev dev-server dev-dashboard test test-sdk test-server lint lint-py lint-ts \
+.PHONY: dev dev-server dev-dashboard test test-sdk test-server test-dashboard lint lint-py lint-ts \
        docker-up docker-down migrate format install
 
 # ---------------------------------------------------------------------------
@@ -26,13 +26,16 @@ install:
 # Testing
 # ---------------------------------------------------------------------------
 
-test: test-sdk test-server
+test: test-sdk test-server test-dashboard
 
 test-sdk:
 	cd sdk && python -m pytest tests/ -v
 
 test-server:
 	cd server && python -m pytest tests/ -v
+
+test-dashboard:
+	cd dashboard && npm test
 
 # ---------------------------------------------------------------------------
 # Linting & Formatting

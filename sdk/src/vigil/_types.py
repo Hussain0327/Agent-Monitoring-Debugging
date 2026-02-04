@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class SpanKind(str, enum.Enum):
+class SpanKind(enum.StrEnum):
     LLM = "llm"
     TOOL = "tool"
     CHAIN = "chain"
@@ -19,7 +19,7 @@ class SpanKind(str, enum.Enum):
     CUSTOM = "custom"
 
 
-class SpanStatus(str, enum.Enum):
+class SpanStatus(enum.StrEnum):
     OK = "ok"
     ERROR = "error"
     UNSET = "unset"
@@ -27,7 +27,7 @@ class SpanStatus(str, enum.Enum):
 
 class Event(BaseModel):
     name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     attributes: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -42,11 +42,11 @@ class Span(BaseModel):
     output: dict[str, Any] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     events: list[Event] = Field(default_factory=list)
-    start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
     end_time: datetime | None = None
 
     def end(self, status: SpanStatus = SpanStatus.OK) -> None:
-        self.end_time = datetime.now(timezone.utc)
+        self.end_time = datetime.now(UTC)
         self.status = status
 
     def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None:
@@ -63,10 +63,11 @@ class Trace(BaseModel):
     trace_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     name: str = ""
     project_id: str = ""
+    status: str = "unset"
     metadata: dict[str, Any] = Field(default_factory=dict)
     spans: list[Span] = Field(default_factory=list)
-    start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
     end_time: datetime | None = None
 
     def end(self) -> None:
-        self.end_time = datetime.now(timezone.utc)
+        self.end_time = datetime.now(UTC)

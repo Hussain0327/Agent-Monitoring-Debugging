@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from vigil._client import get_client
 from vigil._context import get_current_span, set_current_span

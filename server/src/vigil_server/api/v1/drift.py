@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from vigil_server.dependencies import CurrentProject, DBSession
+from vigil_server.dependencies import CurrentProject, DBSession  # noqa: TC001
 from vigil_server.schemas.drift import DriftAlertResponse, DriftSummary
 from vigil_server.services.drift_detector import get_drift_alerts, get_drift_summary
 

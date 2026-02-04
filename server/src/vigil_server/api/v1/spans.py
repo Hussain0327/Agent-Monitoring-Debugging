@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Query
-
 from sqlalchemy import func, select
 
-from vigil_server.dependencies import CurrentProject, DBSession
+from vigil_server.dependencies import CurrentProject, DBSession  # noqa: TC001
 from vigil_server.models.span import Span as SpanModel
 from vigil_server.models.trace import Trace as TraceModel
 from vigil_server.schemas.spans import SpanListResponse, SpanResponse

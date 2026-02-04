@@ -17,13 +17,14 @@ class Trace(UUIDMixin, TimestampMixin, Base):
     project_id: Mapped[str] = mapped_column(String(64), index=True)
     name: Mapped[str] = mapped_column(String(256), default="")
     status: Mapped[str] = mapped_column(String(32), default="unset")
-    metadata_: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSON, default=dict, nullable=True
+    external_id: Mapped[str | None] = mapped_column(
+        String(256), unique=True, index=True, nullable=True
     )
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=True)
     start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    spans: Mapped[list["Span"]] = relationship(  # noqa: F821
+    spans: Mapped[list[Span]] = relationship(  # noqa: F821
         back_populates="trace",
         cascade="all, delete-orphan",
         lazy="selectin",

@@ -20,7 +20,7 @@ class Project(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(256))
     description: Mapped[str] = mapped_column(String(1024), default="")
 
-    api_keys: Mapped[list["APIKey"]] = relationship(
+    api_keys: Mapped[list[APIKey]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -37,4 +37,4 @@ class APIKey(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(128), default="default")
     is_active: Mapped[bool] = mapped_column(default=True)
 
-    project: Mapped["Project"] = relationship(back_populates="api_keys")
+    project: Mapped[Project] = relationship(back_populates="api_keys")

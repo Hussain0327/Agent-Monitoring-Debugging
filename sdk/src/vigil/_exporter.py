@@ -7,15 +7,16 @@ Failed flushes are retried with exponential backoff capped at 30 s.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import queue
-import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from vigil._config import SDKConfig
-from vigil._types import Span
+if TYPE_CHECKING:
+    from vigil._config import SDKConfig
+    from vigil._types import Span
 
 logger = logging.getLogger("vigil.exporter")
 
@@ -56,10 +57,8 @@ class BatchSpanExporter:
         self._running = False
         if self._flush_task:
             self._flush_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._flush_task
-            except asyncio.CancelledError:
-                pass
         await self.flush()
         if self._client:
             await self._client.aclose()
@@ -144,7 +143,7 @@ class BatchSpanExporter:
         while self._running:
             # Exponential backoff: double interval on each consecutive failure, cap at 30s
             if self._consecutive_failures > 0:
-                backoff = min(base_interval * (2 ** self._consecutive_failures), 30.0)
+                backoff = min(base_interval * (2**self._consecutive_failures), 30.0)
             else:
                 backoff = base_interval
             await asyncio.sleep(backoff)

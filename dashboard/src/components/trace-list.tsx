@@ -8,11 +8,20 @@ import { formatDuration, formatDate } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
-export function TraceList() {
+interface TraceListProps {
+  filters?: {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  };
+}
+
+export function TraceList({ filters }: TraceListProps = {}) {
   const [page, setPage] = useState(0);
   const { data, isLoading, error } = useTraces({
     offset: page * PAGE_SIZE,
     limit: PAGE_SIZE,
+    ...filters,
   });
 
   if (isLoading) {

@@ -23,11 +23,11 @@ class Span(UUIDMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), default="unset", index=True)
     input: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     output: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    metadata_: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSON, default=dict, nullable=True
-    )
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=True)
     events: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=True)
-    start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    start_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    trace: Mapped["Trace"] = relationship(back_populates="spans")  # noqa: F821
+    trace: Mapped[Trace] = relationship(back_populates="spans")  # noqa: F821

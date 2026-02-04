@@ -52,6 +52,18 @@ jobs:
       - name: Run tests
         run: cd server && python -m pytest tests/ -v
 
+  test-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: cd dashboard && npm ci
+      - name: Run tests
+        run: cd dashboard && npm test
+
   lint-dashboard:
     runs-on: ubuntu-latest
     steps:
@@ -65,3 +77,10 @@ jobs:
         run: cd dashboard && npm run lint
       - name: Build
         run: cd dashboard && npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker images
+        run: docker compose build

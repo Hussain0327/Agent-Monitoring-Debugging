@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vigil_server.config import settings
@@ -13,41 +14,48 @@ from vigil_server.db.session import async_session
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Provide an async database session."""
-    async with async_session() as session:
-        async with session.begin():
-            yield session
+    async with async_session() as session, session.begin():
+        yield session
 
 
 async def get_current_project(
     authorization: Annotated[str | None, Header()] = None,
     db: AsyncSession = Depends(get_db),
 ) -> str:
-    """Extract project_id from API key in Authorization header."""
+    """Extract project_id from API key or JWT in Authorization header."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing or invalid Authorization header",
         )
 
-    api_key = authorization.removeprefix("Bearer ").strip()
+    token = authorization.removeprefix("Bearer ").strip()
 
-    # Dev key returns default project
-    if api_key == settings.api_key:
+    # Try JWT decode first
+    from vigil_server.services.auth_service import decode_token
+
+    subject = decode_token(token)
+    if subject is not None:
+        # Valid JWT — subject is user id; return "default" project for JWT users
         return "default"
 
-    # Look up in database
+    # Dev key returns default project
+    if token == settings.api_key:
+        return "default"
+
+    # Look up as API key in database
     from sqlalchemy import select
 
     from vigil_server.models.project import APIKey
 
-    stmt = select(APIKey).where(APIKey.key == api_key, APIKey.is_active == True)  # noqa: E712
+    stmt = select(APIKey).where(APIKey.key == token, APIKey.is_active == True)  # noqa: E712
     result = await db.execute(stmt)
     key_record = result.scalar_one_or_none()
 
     if not key_record:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
+            detail="Invalid API key or token",
         )
 
     return key_record.project_id

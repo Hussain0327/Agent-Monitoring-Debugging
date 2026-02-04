@@ -51,6 +51,7 @@ class IngestRequest(BaseModel):
     project_id: str = ""
     trace_name: str = ""
     trace_metadata: dict[str, Any] = Field(default_factory=dict)
+    external_id: str | None = None
 
 
 class IngestResponse(BaseModel):
@@ -87,6 +88,7 @@ class TraceResponse(BaseModel):
     project_id: str
     name: str
     status: str
+    external_id: str | None = None
     metadata: dict[str, Any]
     start_time: datetime | None
     end_time: datetime | None
@@ -104,3 +106,24 @@ class TraceListResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class EventAppendRequest(BaseModel):
+    """Schema for appending an event to a trace's span."""
+
+    name: str = Field(..., min_length=1, max_length=256)
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class TraceUpdateRequest(BaseModel):
+    """Schema for updating a trace."""
+
+    status: str | None = None
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str | None) -> str | None:
+        if v is not None and v not in VALID_STATUSES:
+            raise ValueError(f"status must be one of {VALID_STATUSES}, got '{v}'")
+        return v

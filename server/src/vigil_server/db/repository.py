@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Generic, Sequence, Type, TypeVar
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from sqlalchemy import select
@@ -21,7 +22,7 @@ ModelT = TypeVar("ModelT", bound=Base)
 class Repository(Generic[ModelT]):
     """Generic async CRUD operations for SQLAlchemy models."""
 
-    def __init__(self, model: Type[ModelT], session: AsyncSession) -> None:
+    def __init__(self, model: type[ModelT], session: AsyncSession) -> None:
         self._model = model
         self._session = session
 
@@ -33,17 +34,17 @@ class Repository(Generic[ModelT]):
             await self._session.flush()
             await self._session.refresh(instance)
             return instance
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             logger.exception("Failed to create %s", self._model.__name__)
-            raise VigilError(f"Failed to create {self._model.__name__}", status_code=500)
+            raise VigilError(f"Failed to create {self._model.__name__}", status_code=500) from exc
 
     async def get(self, id: UUID | str) -> ModelT | None:
         """Fetch a model by primary key."""
         try:
             return await self._session.get(self._model, id)
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             logger.exception("Failed to get %s with id=%s", self._model.__name__, id)
-            raise VigilError(f"Failed to fetch {self._model.__name__}", status_code=500)
+            raise VigilError(f"Failed to fetch {self._model.__name__}", status_code=500) from exc
 
     async def list(
         self,
@@ -60,9 +61,9 @@ class Repository(Generic[ModelT]):
             stmt = stmt.offset(offset).limit(limit)
             result = await self._session.execute(stmt)
             return result.scalars().all()
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             logger.exception("Failed to list %s", self._model.__name__)
-            raise VigilError(f"Failed to list {self._model.__name__}", status_code=500)
+            raise VigilError(f"Failed to list {self._model.__name__}", status_code=500) from exc
 
     async def delete(self, id: UUID | str) -> bool:
         """Delete a model by primary key. Returns True if deleted."""
@@ -73,6 +74,6 @@ class Repository(Generic[ModelT]):
                 await self._session.flush()
                 return True
             return False
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             logger.exception("Failed to delete %s with id=%s", self._model.__name__, id)
-            raise VigilError(f"Failed to delete {self._model.__name__}", status_code=500)
+            raise VigilError(f"Failed to delete {self._model.__name__}", status_code=500) from exc

@@ -73,6 +73,46 @@ async def retrieve(query):
     ...
 ```
 
+## Context Manager
+
+Use `trace_context` for manual trace lifecycle management with automatic cleanup:
+
+```python
+from vigil import trace_context, get_client
+
+client = vigil.get_client()
+
+# Async
+async with trace_context(client, "my-operation", metadata={"k": "v"}) as trace:
+    # trace is active here
+    ...
+# trace is automatically ended (with error status on exception)
+
+# Sync
+with trace_context(client, "sync-operation") as trace:
+    ...
+```
+
+## Convenience Functions
+
+High-level helpers that no-op gracefully when no client is active:
+
+```python
+import vigil
+
+# Add an event to the current span
+vigil.log_event("cache-hit", {"key": "user:123"})
+
+# Attach metadata to the current span or trace
+vigil.attach_metadata("user_id", "u123")
+
+# Log an LLM call (creates and ends an LLM span)
+vigil.log_llm_call("gpt-4", input={"prompt": "Hi"}, output={"text": "Hello"})
+
+# Log a tool call (creates and ends a TOOL span)
+vigil.log_tool_call("search", input={"query": "foo"}, output={"results": [...]})
+```
+
 ## Span Kinds
 
 | Kind | Use Case |
@@ -86,14 +126,53 @@ async def retrieve(query):
 
 ## Integrations
 
+Auto-instrument third-party LLM libraries:
+
 ```python
-from vigil.integrations import activate
+import vigil
 
-# Auto-instrument OpenAI calls
-activate("openai")
+# Activate specific integration
+vigil.activate_integration("openai")
+vigil.activate_integration("anthropic")
 
-# Auto-instrument Anthropic calls
-activate("anthropic")
+# Or activate all registered integrations
+vigil.activate_all_integrations()
+
+# List available integrations
+print(vigil.available_integrations())  # ["openai", "anthropic"]
 ```
+
+### OpenAI
+Patches `Completions.create` and `AsyncCompletions.create` to automatically capture LLM spans with model, messages, and usage data.
+
+### Anthropic
+Patches `Messages.create` and `AsyncMessages.create` to automatically capture LLM spans with model, messages, and usage data.
+
+## Public API
+
+All exports available from `import vigil`:
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `init()` | async function | Initialize the SDK |
+| `shutdown()` | async function | Shut down the SDK |
+| `get_client()` | function | Get the global client |
+| `trace()` | decorator | Create a new trace |
+| `span()` | decorator | Create a new span |
+| `trace_context` | context manager | Manual trace lifecycle |
+| `current_span()` | function | Get the current span |
+| `current_trace()` | function | Get the current trace |
+| `log_event()` | function | Add event to current span |
+| `attach_metadata()` | function | Attach metadata to span/trace |
+| `log_llm_call()` | function | Log an LLM call as a span |
+| `log_tool_call()` | function | Log a tool call as a span |
+| `activate_integration()` | function | Activate a named integration |
+| `activate_all_integrations()` | function | Activate all integrations |
+| `available_integrations()` | function | List registered integrations |
+| `Trace` | class | Trace data model |
+| `Span` | class | Span data model |
+| `Event` | class | Event data model |
+| `SpanKind` | enum | Span kind constants |
+| `SpanStatus` | enum | Span status constants |
 
 See [SDK Files](files.md) for details on every source file.

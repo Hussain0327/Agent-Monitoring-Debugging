@@ -1,7 +1,8 @@
 "use client";
 
-import { TraceList } from "@/components/trace-list";
 import { MetricsChart } from "@/components/metrics-chart";
+import { TraceList } from "@/components/trace-list";
+import Link from "next/link";
 
 export default function DashboardPage() {
   return (
@@ -14,7 +15,15 @@ export default function DashboardPage() {
       <MetricsChart />
 
       <div>
-        <h2 className="mb-4 text-lg font-medium">Recent Traces</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-medium">Recent Traces</h2>
+          <Link
+            href="/traces"
+            className="text-sm text-vigil-600 hover:underline"
+          >
+            View all traces
+          </Link>
+        </div>
         <TraceList />
       </div>
     </div>

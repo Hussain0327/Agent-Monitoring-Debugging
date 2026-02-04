@@ -4,8 +4,14 @@ line-length = 100
 src = ["sdk/src", "server/src"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "SIM", "TCH"]
-ignore = ["E501"]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "TC"]
+ignore = [
+    "E501",
+    "B008",   # FastAPI uses function calls (Query, Depends) in argument defaults by design
+    "TC001",  # Runtime-required imports (FastAPI DI, SQLAlchemy, Pydantic)
+    "TC002",  # Runtime-required third-party imports
+    "TC003",  # Runtime-required stdlib imports (datetime in Pydantic/SQLAlchemy models)
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["vigil", "vigil_server"]

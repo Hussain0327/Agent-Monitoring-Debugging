@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:8000`
 
-All endpoints (except health) require authentication via `Authorization: Bearer <api_key>` header.
+All endpoints (except health and auth) require authentication via `Authorization: Bearer <api_key>` or `Authorization: Bearer <jwt_token>` header.
 
 ## Health
 
@@ -30,6 +30,44 @@ Check database connectivity.
 ```json
 {"status": "not_ready", "detail": "..."}
 ```
+
+---
+
+## Authentication
+
+### POST /v1/auth/register
+Register a new user account.
+
+**Auth:** None
+
+**Request Body:**
+```json
+{"email": "user@example.com", "password": "securepass123"}
+```
+
+**Response 201:**
+```json
+{"id": "abc123", "email": "user@example.com", "is_active": true, "created_at": "..."}
+```
+
+**Response 409:** Email already registered.
+
+### POST /v1/auth/login
+Authenticate and receive a JWT token.
+
+**Auth:** None
+
+**Request Body:**
+```json
+{"email": "user@example.com", "password": "securepass123"}
+```
+
+**Response 200:**
+```json
+{"access_token": "eyJ...", "token_type": "bearer"}
+```
+
+**Response 401:** Invalid credentials.
 
 ---
 
@@ -61,7 +99,8 @@ Ingest a batch of spans.
   ],
   "project_id": "my-project",
   "trace_name": "my-pipeline",
-  "trace_metadata": {}
+  "trace_metadata": {},
+  "external_id": "ext-123"
 }
 ```
 
@@ -71,7 +110,7 @@ Ingest a batch of spans.
 ```
 
 ### GET /v1/traces
-List traces with pagination.
+List traces with pagination and filtering.
 
 **Auth:** Required
 
@@ -80,6 +119,9 @@ List traces with pagination.
 |-------|------|---------|-------------|
 | `offset` | int | 0 | Pagination offset |
 | `limit` | int | 50 | Items per page (1-200) |
+| `status` | string | null | Filter by status (ok, error, unset) |
+| `start_date` | datetime | null | Filter traces after this date |
+| `end_date` | datetime | null | Filter traces before this date |
 
 **Response 200:**
 ```json
@@ -96,12 +138,43 @@ Get a single trace with all spans.
 
 **Auth:** Required
 
-**Response 200:** Full trace object with spans array.
+**Response 200:** Full trace object with spans array and `external_id` field.
 
 **Response 404:**
 ```json
 {"detail": "Trace not found"}
 ```
+
+### PATCH /v1/traces/{trace_id}
+Update a trace's status and/or metadata.
+
+**Auth:** Required
+
+**Request Body:**
+```json
+{"status": "ok", "metadata": {"key": "value"}}
+```
+
+**Response 200:** Updated trace object.
+
+**Response 404:** Trace not found.
+
+### POST /v1/traces/{trace_id}/events/{span_id}
+Append an event to a span within a trace.
+
+**Auth:** Required
+
+**Request Body:**
+```json
+{"name": "cache-hit", "attributes": {"key": "abc"}}
+```
+
+**Response 201:**
+```json
+{"name": "cache-hit", "timestamp": "...", "attributes": {"key": "abc"}}
+```
+
+**Response 404:** Trace or span not found.
 
 ---
 
@@ -179,7 +252,7 @@ Rotate API key — deactivates old keys and creates a new one.
 ## Replay
 
 ### POST /v1/traces/{trace_id}/replay
-Replay a trace with input mutations.
+Replay a trace with input mutations. Persists a ReplayRun record.
 
 **Auth:** Required
 
@@ -206,7 +279,40 @@ Replay a trace with input mutations.
       "mutated_input": {...},
       "original_output": {...}
     }
-  ]
+  ],
+  "replay_run_id": "run-abc"
+}
+```
+
+### GET /v1/traces/{trace_id}/replay/{replay_id}
+Get the status of a replay run.
+
+**Auth:** Required
+
+**Response 200:**
+```json
+{
+  "id": "run-abc",
+  "original_trace_id": "trace-001",
+  "status": "completed",
+  "created_by": null,
+  "config": {...},
+  "result_trace_id": null,
+  "created_at": "..."
+}
+```
+
+### GET /v1/traces/{trace_id}/replay/{replay_id}/diff
+Get the diff output from a completed replay run.
+
+**Auth:** Required
+
+**Response 200:**
+```json
+{
+  "original_trace_id": "trace-001",
+  "mutations": {...},
+  "diffs": [...]
 }
 ```
 
