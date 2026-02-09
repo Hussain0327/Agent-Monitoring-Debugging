@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { api } from "@/lib/api";
+import { Zap } from "lucide-react";
 
 const placeholderData = [
   { time: "00:00", latency: 0 },
@@ -70,34 +71,55 @@ export function MetricsChart() {
   const hasData = spanData && spanData.spans.length > 0;
 
   return (
-    <div className="rounded-lg border border-[var(--border)] p-4">
-      <h3 className="mb-4 text-sm font-medium">
-        Latency (ms) — Last 24h
-        {!hasData && (
-          <span className="ml-2 text-xs text-[var(--muted-foreground)]">
-            (no data yet)
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--background-raised)] p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <Zap size={14} className="text-[var(--accent)]" />
+        <h3 className="text-sm font-semibold">
+          Latency
+          <span className="ml-2 font-mono text-[11px] font-normal text-[var(--muted-foreground)]">
+            24h {!hasData && "— no data"}
           </span>
-        )}
-      </h3>
+        </h3>
+      </div>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={chartData}>
+          <defs>
+            <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.2} />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-          <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
-          <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
+          <XAxis
+            dataKey="time"
+            tick={{ fontSize: 11, fontFamily: "JetBrains Mono", fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fontFamily: "JetBrains Mono", fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
+            axisLine={false}
+            tickLine={false}
+            width={40}
+          />
           <Tooltip
             contentStyle={{
-              backgroundColor: "var(--muted)",
+              backgroundColor: "var(--background-elevated)",
               border: "1px solid var(--border)",
-              borderRadius: "6px",
+              borderRadius: "8px",
               fontSize: "12px",
+              fontFamily: "JetBrains Mono",
+              color: "var(--foreground)",
             }}
+            labelStyle={{ color: "var(--muted-foreground)" }}
           />
           <Area
             type="monotone"
             dataKey="latency"
-            stroke="#5c7cfa"
-            fill="#5c7cfa"
-            fillOpacity={0.1}
+            stroke="var(--accent)"
+            fill="url(#latencyGradient)"
             strokeWidth={2}
           />
         </AreaChart>

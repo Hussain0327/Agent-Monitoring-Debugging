@@ -24,7 +24,7 @@ describe("TraceFilters", () => {
   it("calls onChange with empty object when clear is clicked", () => {
     const onChange = vi.fn();
     render(<TraceFilters filters={{ status: "ok" }} onChange={onChange} />);
-    fireEvent.click(screen.getByText("Clear filters"));
+    fireEvent.click(screen.getByText("Clear"));
     expect(onChange).toHaveBeenCalledWith({});
   });
 

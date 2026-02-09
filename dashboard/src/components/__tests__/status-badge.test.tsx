@@ -19,22 +19,22 @@ describe("StatusBadge", () => {
     expect(badge.getAttribute("aria-label")).toBe("Status: error");
   });
 
-  it("applies green classes for ok status", () => {
+  it("applies success styles for ok status", () => {
     render(<StatusBadge status="ok" />);
     const badge = screen.getByRole("status");
-    expect(badge.className).toContain("bg-green");
+    expect(badge.className).toContain("success");
   });
 
-  it("applies red classes for error status", () => {
+  it("applies danger styles for error status", () => {
     render(<StatusBadge status="error" />);
     const badge = screen.getByRole("status");
-    expect(badge.className).toContain("bg-red");
+    expect(badge.className).toContain("danger");
   });
 
-  it("applies gray classes for unknown status", () => {
+  it("applies muted styles for unknown status", () => {
     render(<StatusBadge status="unknown_thing" />);
     const badge = screen.getByRole("status");
-    expect(badge.className).toContain("bg-gray");
+    expect(badge.className).toContain("muted-foreground");
   });
 
   it("supports sm size", () => {
@@ -46,6 +46,6 @@ describe("StatusBadge", () => {
   it("defaults to md size", () => {
     render(<StatusBadge status="ok" />);
     const badge = screen.getByRole("status");
-    expect(badge.className).toContain("text-xs");
+    expect(badge.className).toContain("text-[11px]");
   });
 });

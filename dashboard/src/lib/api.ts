@@ -1,4 +1,15 @@
-import type { Trace, TraceListResponse, SpanListResponse, DriftAlert, DriftSummary, ReplayRun, ReplayDiff } from "./types";
+import type {
+  Trace,
+  TraceListResponse,
+  SpanListResponse,
+  DriftAlert,
+  DriftSummary,
+  ReplayRun,
+  ReplayDiff,
+  ReplayEstimateResponse,
+  Notification,
+  ProjectSettings,
+} from "./types";
 import { getToken, clearToken } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -33,9 +44,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (res.status === 401) {
     clearToken();
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
     throw new APIError(401, "Unauthorized");
   }
 
@@ -121,13 +129,31 @@ export const api = {
     summary(): Promise<DriftSummary> {
       return request("/v1/drift/summary");
     },
+
+    resolve(alertId: string): Promise<DriftAlert> {
+      return request(`/v1/drift/alerts/${alertId}/resolve`, {
+        method: "PATCH",
+      });
+    },
   },
 
   replay: {
-    run(traceId: string, mutations: Record<string, Record<string, unknown>>): Promise<{ original_trace_id: string; mutations: Record<string, unknown>; diffs: Record<string, unknown>[]; replay_run_id?: string }> {
+    run(traceId: string, mutations: Record<string, Record<string, unknown>>): Promise<ReplayEstimateResponse> {
       return request(`/v1/traces/${traceId}/replay`, {
         method: "POST",
         body: JSON.stringify({ mutations }),
+      });
+    },
+
+    confirm(traceId: string, replayId: string): Promise<ReplayRun> {
+      return request(`/v1/traces/${traceId}/replay/${replayId}/confirm`, {
+        method: "POST",
+      });
+    },
+
+    cancel(traceId: string, replayId: string): Promise<ReplayRun> {
+      return request(`/v1/traces/${traceId}/replay/${replayId}/cancel`, {
+        method: "POST",
       });
     },
 
@@ -137,6 +163,53 @@ export const api = {
 
     diff(traceId: string, replayId: string): Promise<ReplayDiff> {
       return request(`/v1/traces/${traceId}/replay/${replayId}/diff`);
+    },
+  },
+
+  notifications: {
+    list(params?: { unread_only?: boolean; limit?: number; offset?: number }): Promise<Notification[]> {
+      const qs = new URLSearchParams();
+      if (params?.unread_only) qs.set("unread_only", "true");
+      if (params?.limit) qs.set("limit", String(params.limit));
+      if (params?.offset) qs.set("offset", String(params.offset));
+      const query = qs.toString();
+      return request(`/v1/notifications${query ? `?${query}` : ""}`);
+    },
+
+    markRead(id: string): Promise<Notification> {
+      return request(`/v1/notifications/${id}/read`, {
+        method: "PATCH",
+      });
+    },
+
+    markAllRead(): Promise<{ marked_read: number }> {
+      return request("/v1/notifications/read-all", {
+        method: "POST",
+      });
+    },
+
+    count(): Promise<{ unread: number }> {
+      return request("/v1/notifications/count");
+    },
+  },
+
+  projects: {
+    getSettings(projectId: string): Promise<ProjectSettings> {
+      return request(`/v1/projects/${projectId}/settings`);
+    },
+
+    updateSettings(projectId: string, data: {
+      openai_api_key?: string;
+      anthropic_api_key?: string;
+      default_openai_model?: string;
+      default_anthropic_model?: string;
+      drift_check_interval_minutes?: number;
+      drift_check_enabled?: boolean;
+    }): Promise<ProjectSettings> {
+      return request(`/v1/projects/${projectId}/settings`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
     },
   },
 };

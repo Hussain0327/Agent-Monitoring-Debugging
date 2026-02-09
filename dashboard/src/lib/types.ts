@@ -82,22 +82,84 @@ export interface ReplayRun {
   created_by: string | null;
   config: Record<string, unknown>;
   result_trace_id: string | null;
+  estimated_cost_usd: number | null;
+  actual_cost_usd: number | null;
+  error_message: string | null;
+  llm_spans_count: number;
+  project_id: string | null;
   created_at: string;
+}
+
+export interface ReplayEstimateResponse {
+  replay_run_id: string;
+  original_trace_id: string;
+  status: string;
+  estimated_cost_usd: number;
+  llm_spans_count: number;
+  llm_spans: Array<{
+    span_id: string;
+    span_name: string;
+    provider: string;
+    estimated_cost_usd: number;
+  }>;
+}
+
+export interface SpanDiff {
+  span_id: string;
+  span_name: string;
+  original_input: Record<string, unknown>;
+  mutated_input: Record<string, unknown>;
+  original_output: Record<string, unknown> | null;
+  new_output: Record<string, unknown> | null;
+  was_executed: boolean;
+  note?: string;
 }
 
 export interface ReplayDiff {
   original_trace_id: string;
   mutations: Record<string, unknown>;
-  diffs: Array<{
-    span_id: string;
-    span_name: string;
-    original_input: Record<string, unknown>;
-    mutated_input: Record<string, unknown>;
-    original_output: Record<string, unknown> | null;
-    note: string;
-  }>;
+  diffs: SpanDiff[];
 }
 
 export interface ReplayConfig {
   mutations: Record<string, Record<string, unknown>>;
+}
+
+export interface Notification {
+  id: string;
+  project_id: string;
+  type: string;
+  title: string;
+  body: string;
+  reference_id: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export interface ProjectSettings {
+  id: string;
+  project_id: string;
+  openai_api_key_set: boolean;
+  openai_api_key_masked: string | null;
+  anthropic_api_key_set: boolean;
+  anthropic_api_key_masked: string | null;
+  default_openai_model: string;
+  default_anthropic_model: string;
+  drift_check_interval_minutes: number;
+  drift_check_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type WebSocketMessageType =
+  | "trace.new"
+  | "drift.alert"
+  | "drift.resolved"
+  | "replay.status"
+  | "notification"
+  | "pong";
+
+export interface WebSocketMessage {
+  type: WebSocketMessageType;
+  data: Record<string, unknown>;
 }

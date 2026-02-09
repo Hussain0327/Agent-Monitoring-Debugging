@@ -35,6 +35,23 @@ export async function login(email: string, password: string): Promise<string> {
   return data.access_token;
 }
 
+export async function register(email: string, password: string): Promise<string> {
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+  const res = await fetch(`${API_BASE}/v1/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || "Registration failed");
+  }
+
+  // Auto-login after registration
+  return login(email, password);
+}
+
 export function logout(): void {
   clearToken();
   if (typeof window !== "undefined") {

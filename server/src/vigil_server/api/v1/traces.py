@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from vigil_server.dependencies import CurrentProject, DBSession  # noqa: TC001
+from vigil_server.dependencies import CurrentProject, DBSession, GuestProject  # noqa: TC001
 from vigil_server.schemas.traces import (
     EventAppendRequest,
     IngestRequest,
@@ -23,6 +23,7 @@ from vigil_server.services.trace_service import (
     list_traces,
     update_trace,
 )
+from vigil_server.services.websocket_manager import manager
 
 router = APIRouter(prefix="/traces", tags=["traces"])
 
@@ -35,13 +36,23 @@ async def ingest(
 ) -> IngestResponse:
     """Ingest spans from the SDK."""
     trace_id, count = await ingest_spans(db, request, project_id)
+
+    # Broadcast new trace event
+    await manager.broadcast(
+        project_id,
+        {
+            "type": "trace.new",
+            "data": {"trace_id": trace_id, "span_count": count},
+        },
+    )
+
     return IngestResponse(trace_id=trace_id, span_count=count)
 
 
 @router.get("")
 async def list_all(
     db: DBSession,
-    project_id: CurrentProject,
+    project_id: GuestProject,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     status_filter: str | None = Query(None, alias="status"),
@@ -70,7 +81,7 @@ async def list_all(
 async def get_one(
     trace_id: str,
     db: DBSession,
-    project_id: CurrentProject,
+    project_id: GuestProject,
 ) -> TraceResponse:
     """Get a single trace with all spans."""
     trace = await get_trace(db, trace_id)

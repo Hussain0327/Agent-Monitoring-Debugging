@@ -16,7 +16,7 @@ interface SpanTreeProps {
 
 export function SpanTree({ nodes, onSelect, selectedId, depth = 0 }: SpanTreeProps) {
   return (
-    <div role={depth === 0 ? "tree" : "group"} className="space-y-0.5">
+    <div role={depth === 0 ? "tree" : "group"} className="space-y-px">
       {nodes.map((node) => (
         <SpanTreeItem
           key={node.span.id}
@@ -81,30 +81,32 @@ function SpanTreeItem({
         }}
         onKeyDown={handleKeyDown}
         className={cn(
-          "flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm transition-colors",
-          isSelected ? "bg-vigil-100 dark:bg-vigil-900/30" : "hover:bg-[var(--muted)]",
+          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
+          isSelected
+            ? "bg-[var(--accent-dim)] text-[var(--foreground)]"
+            : "text-[var(--foreground)] hover:bg-[var(--background-elevated)]",
         )}
         style={{ paddingLeft: `${depth * 20 + 8}px` }}
       >
         {hasChildren ? (
           expanded ? (
-            <ChevronDown size={14} className="shrink-0 text-[var(--muted-foreground)]" />
+            <ChevronDown size={12} className="shrink-0 text-[var(--muted-foreground)]" />
           ) : (
-            <ChevronRight size={14} className="shrink-0 text-[var(--muted-foreground)]" />
+            <ChevronRight size={12} className="shrink-0 text-[var(--muted-foreground)]" />
           )
         ) : (
-          <span className="w-3.5 shrink-0" />
+          <span className="w-3 shrink-0" />
         )}
 
         <StatusBadge status={node.span.status} size="sm" />
 
-        <span className="truncate font-mono">{node.span.name || "unnamed"}</span>
+        <span className="truncate font-mono text-xs">{node.span.name || "unnamed"}</span>
 
-        <span className="ml-auto shrink-0 text-xs text-[var(--muted-foreground)]">
+        <span className="ml-auto shrink-0 rounded-md bg-[var(--background-elevated)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--muted-foreground)]">
           {node.span.kind}
         </span>
 
-        <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
+        <span className="shrink-0 font-mono text-[10px] text-[var(--muted-foreground)]">
           {formatDuration(node.span.start_time, node.span.end_time)}
         </span>
       </button>

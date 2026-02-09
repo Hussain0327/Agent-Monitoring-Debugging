@@ -8,7 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from vigil_server.models import Base
-from vigil_server.dependencies import get_db, get_current_project
+from vigil_server.dependencies import get_db, get_current_project, get_optional_project
 from vigil_server.main import app
 
 
@@ -45,6 +45,7 @@ async def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_project] = override_get_project
+    app.dependency_overrides[get_optional_project] = override_get_project
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

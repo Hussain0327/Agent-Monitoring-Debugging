@@ -7,10 +7,19 @@ interface TraceTimelineProps {
   spans: Span[];
 }
 
+const kindColors: Record<string, { bar: string; text: string }> = {
+  llm: { bar: "bg-[var(--accent)]", text: "text-[var(--accent-text)]" },
+  tool: { bar: "bg-[var(--success)]", text: "text-[var(--success)]" },
+  chain: { bar: "bg-purple-400", text: "text-purple-400" },
+  retriever: { bar: "bg-orange-400", text: "text-orange-400" },
+  agent: { bar: "bg-pink-400", text: "text-pink-400" },
+  custom: { bar: "bg-[var(--muted-foreground)]", text: "text-[var(--muted-foreground)]" },
+};
+
 export function TraceTimeline({ spans }: TraceTimelineProps) {
   if (!spans.length) {
     return (
-      <div className="text-sm text-[var(--muted-foreground)]">No spans to display.</div>
+      <div className="font-mono text-xs text-[var(--muted-foreground)]">No spans to display.</div>
     );
   }
 
@@ -21,22 +30,13 @@ export function TraceTimeline({ spans }: TraceTimelineProps) {
 
   if (!times.length) {
     return (
-      <div className="text-sm text-[var(--muted-foreground)]">No timing data available.</div>
+      <div className="font-mono text-xs text-[var(--muted-foreground)]">No timing data available.</div>
     );
   }
 
   const minTime = Math.min(...times);
   const maxTime = Math.max(...times);
   const totalDuration = maxTime - minTime || 1;
-
-  const kindColors: Record<string, string> = {
-    llm: "bg-blue-500",
-    tool: "bg-green-500",
-    chain: "bg-purple-500",
-    retriever: "bg-orange-500",
-    agent: "bg-pink-500",
-    custom: "bg-gray-500",
-  };
 
   return (
     <div className="space-y-1">
@@ -45,25 +45,41 @@ export function TraceTimeline({ spans }: TraceTimelineProps) {
         const end = span.end_time ? new Date(span.end_time).getTime() : maxTime;
         const leftPct = ((start - minTime) / totalDuration) * 100;
         const widthPct = Math.max(((end - start) / totalDuration) * 100, 1);
+        const colors = kindColors[span.kind] || kindColors.custom;
 
         return (
-          <div key={span.id} className="flex items-center gap-2 text-xs">
-            <div className="w-32 truncate text-[var(--muted-foreground)]" title={span.name}>
+          <div key={span.id} className="flex items-center gap-3 text-xs">
+            <div
+              className="w-32 truncate font-mono text-[11px] text-[var(--muted-foreground)]"
+              title={span.name}
+            >
               {span.name || "unnamed"}
             </div>
-            <div className="relative h-5 flex-1 rounded bg-[var(--muted)]">
+            <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-[var(--background)]">
               <div
-                className={cn("absolute h-full rounded", kindColors[span.kind] || "bg-gray-400")}
+                className={cn("absolute h-full rounded-md opacity-80 transition-all", colors.bar)}
                 style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                 title={`${span.kind} | ${end - start}ms`}
               />
             </div>
-            <div className="w-16 text-right text-[var(--muted-foreground)]">
+            <div className={cn("w-16 text-right font-mono text-[10px]", colors.text)}>
               {end - start}ms
             </div>
           </div>
         );
       })}
+
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--border)] pt-3">
+        {Object.entries(kindColors).map(([kind, colors]) => (
+          <div key={kind} className="flex items-center gap-1.5">
+            <div className={cn("h-2 w-2 rounded-full", colors.bar)} />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
+              {kind}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

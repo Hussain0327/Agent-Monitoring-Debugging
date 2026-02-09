@@ -13,7 +13,8 @@ export function useTraces(params?: {
   return useQuery({
     queryKey: ["traces", params],
     queryFn: () => api.traces.list(params),
-    refetchInterval: 5000,
+    // WebSocket invalidation is primary; keep polling as fallback at 30s
+    refetchInterval: 30000,
   });
 }
 

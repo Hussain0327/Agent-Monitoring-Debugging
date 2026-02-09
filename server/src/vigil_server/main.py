@@ -34,11 +34,41 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("SQLite tables created")
 
+    # Crash recovery: mark any "running" replays as "failed"
+    await _recover_stuck_replays()
+
+    # Start drift scheduler
+    from vigil_server.services.scheduler import drift_scheduler
+
+    await drift_scheduler.start()
+
     yield
 
     # Cleanup
+    await drift_scheduler.stop()
     await engine.dispose()
     logger.info("Vigil server shut down")
+
+
+async def _recover_stuck_replays() -> None:
+    """Set any replays stuck in 'running' or 'confirmed' status to 'failed'."""
+    from sqlalchemy import update
+
+    from vigil_server.db.session import async_session
+    from vigil_server.models.replay import ReplayRun
+
+    try:
+        async with async_session() as session, session.begin():
+            stmt = (
+                update(ReplayRun)
+                .where(ReplayRun.status.in_(["running", "confirmed"]))
+                .values(status="failed", error_message="Server restarted during execution")
+            )
+            result = await session.execute(stmt)
+            if result.rowcount:
+                logger.warning("Recovered %d stuck replay runs on startup", result.rowcount)
+    except Exception:
+        logger.exception("Failed to recover stuck replays on startup")
 
 
 def create_app() -> FastAPI:

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
+    # Encryption
+    encryption_key: str = ""
+
     # Rate limiting
     rate_limit_requests: int = 100
     rate_limit_window_seconds: int = 60

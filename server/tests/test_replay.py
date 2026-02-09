@@ -1,10 +1,8 @@
-"""Tests for trace replay endpoint."""
+"""Tests for trace replay endpoints."""
 
 from __future__ import annotations
 
 import uuid
-
-import pytest
 
 
 class TestReplay:
@@ -15,8 +13,8 @@ class TestReplay:
         )
         assert res.status_code == 404
 
-    async def test_replay_with_mutations(self, client):
-        # First ingest a trace with spans
+    async def test_replay_estimate_with_mutations(self, client):
+        """POST /v1/traces/{id}/replay now returns a cost estimate."""
         span_id = uuid.uuid4().hex
         trace_id = uuid.uuid4().hex
         await client.post(
@@ -26,7 +24,7 @@ class TestReplay:
                     {
                         "span_id": span_id,
                         "trace_id": trace_id,
-                        "name": "llm-call",
+                        "name": "openai-llm-call",
                         "kind": "llm",
                         "status": "ok",
                         "input": {"model": "gpt-4", "prompt": "hello"},
@@ -37,7 +35,7 @@ class TestReplay:
             },
         )
 
-        # Now replay with mutations
+        # Replay now returns a cost estimate (two-phase API)
         res = await client.post(
             f"/v1/traces/{trace_id}/replay",
             json={"mutations": {span_id: {"model": "gpt-4-turbo"}}},
@@ -45,17 +43,29 @@ class TestReplay:
         assert res.status_code == 200
         data = res.json()
         assert data["original_trace_id"] == trace_id
-        assert len(data["diffs"]) == 1
-        assert data["diffs"][0]["mutated_input"]["model"] == "gpt-4-turbo"
+        assert data["status"] == "estimating"
         assert "replay_run_id" in data
+        assert "estimated_cost_usd" in data
+        assert data["llm_spans_count"] == 1
+        assert len(data["llm_spans"]) == 1
+        assert data["llm_spans"][0]["provider"] == "openai"
 
-    async def test_replay_no_mutations(self, client):
+    async def test_replay_estimate_no_llm_spans(self, client):
+        """Non-LLM spans result in zero LLM spans in estimate."""
         span_id = uuid.uuid4().hex
         trace_id = uuid.uuid4().hex
         await client.post(
             "/v1/traces",
             json={
-                "spans": [{"span_id": span_id, "trace_id": trace_id, "name": "test", "kind": "custom", "status": "ok"}],
+                "spans": [
+                    {
+                        "span_id": span_id,
+                        "trace_id": trace_id,
+                        "name": "test",
+                        "kind": "custom",
+                        "status": "ok",
+                    }
+                ],
                 "trace_name": "test",
             },
         )
@@ -64,7 +74,10 @@ class TestReplay:
             json={"mutations": {}},
         )
         assert res.status_code == 200
-        assert res.json()["diffs"] == []
+        data = res.json()
+        assert data["llm_spans_count"] == 0
+        assert data["llm_spans"] == []
+        assert data["estimated_cost_usd"] == 0.0
 
     async def test_get_replay_status(self, client):
         """GET /v1/traces/{id}/replay/{replay_id} returns replay run status."""
@@ -73,7 +86,14 @@ class TestReplay:
         await client.post(
             "/v1/traces",
             json={
-                "spans": [{"span_id": span_id, "trace_id": trace_id, "name": "t", "kind": "custom"}],
+                "spans": [
+                    {
+                        "span_id": span_id,
+                        "trace_id": trace_id,
+                        "name": "t",
+                        "kind": "custom",
+                    }
+                ],
                 "trace_name": "replay-status-test",
             },
         )
@@ -86,35 +106,38 @@ class TestReplay:
         status_res = await client.get(f"/v1/traces/{trace_id}/replay/{replay_id}")
         assert status_res.status_code == 200
         data = status_res.json()
-        assert data["status"] == "completed"
+        assert data["status"] == "estimating"
         assert data["original_trace_id"] == trace_id
 
-    async def test_get_replay_diff(self, client):
-        """GET /v1/traces/{id}/replay/{replay_id}/diff returns diff data."""
+    async def test_cancel_replay(self, client):
+        """POST cancel transitions from estimating to cancelled."""
         span_id = uuid.uuid4().hex
         trace_id = uuid.uuid4().hex
         await client.post(
             "/v1/traces",
             json={
-                "spans": [{
-                    "span_id": span_id, "trace_id": trace_id,
-                    "name": "t", "kind": "llm",
-                    "input": {"model": "gpt-4"},
-                }],
-                "trace_name": "replay-diff-test",
+                "spans": [
+                    {
+                        "span_id": span_id,
+                        "trace_id": trace_id,
+                        "name": "t",
+                        "kind": "custom",
+                    }
+                ],
+                "trace_name": "cancel-test",
             },
         )
         replay_res = await client.post(
             f"/v1/traces/{trace_id}/replay",
-            json={"mutations": {span_id: {"model": "gpt-4o"}}},
+            json={"mutations": {}},
         )
         replay_id = replay_res.json()["replay_run_id"]
 
-        diff_res = await client.get(f"/v1/traces/{trace_id}/replay/{replay_id}/diff")
-        assert diff_res.status_code == 200
-        data = diff_res.json()
-        assert data["original_trace_id"] == trace_id
-        assert len(data["diffs"]) == 1
+        cancel_res = await client.post(
+            f"/v1/traces/{trace_id}/replay/{replay_id}/cancel"
+        )
+        assert cancel_res.status_code == 200
+        assert cancel_res.json()["status"] == "cancelled"
 
     async def test_get_replay_not_found(self, client):
         """GET replay endpoints return 404 for nonexistent IDs."""

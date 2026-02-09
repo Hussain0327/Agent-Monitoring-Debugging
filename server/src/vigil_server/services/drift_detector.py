@@ -157,6 +157,18 @@ async def detect_drift(
     return alerts
 
 
+async def resolve_drift_alert(
+    session: AsyncSession,
+    alert_id: str,
+) -> DriftAlert | None:
+    """Mark a drift alert as resolved."""
+    alert = await session.get(DriftAlert, alert_id)
+    if alert:
+        alert.resolved = True
+        await session.flush()
+    return alert
+
+
 async def get_drift_alerts(
     session: AsyncSession,
     project_id: str,

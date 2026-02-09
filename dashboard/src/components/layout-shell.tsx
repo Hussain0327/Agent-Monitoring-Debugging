@@ -15,7 +15,11 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       {showSidebar ? (
         <div className="flex h-screen">
           <Sidebar />
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+          <main className="flex-1 overflow-auto bg-[var(--background)] px-8 py-6">
+            <div className="mx-auto max-w-6xl">
+              {children}
+            </div>
+          </main>
         </div>
       ) : (
         <>{children}</>

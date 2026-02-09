@@ -34,17 +34,18 @@ describe("AuthGuard", () => {
     expect(screen.getByText("Protected content")).toBeDefined();
   });
 
-  it("redirects to /login when not authenticated", () => {
+  it("shows children as guest (no auth required to browse)", () => {
     mockIsAuthenticated.mockReturnValue(false);
     render(
       <AuthGuard>
         <div>Protected content</div>
       </AuthGuard>,
     );
-    expect(mockReplace).toHaveBeenCalledWith("/login");
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.getByText("Protected content")).toBeDefined();
   });
 
-  it("allows /login path without auth", () => {
+  it("shows login page without redirect", () => {
     mockIsAuthenticated.mockReturnValue(false);
     mockPathname.mockReturnValue("/login");
     render(

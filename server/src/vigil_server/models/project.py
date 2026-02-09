@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import secrets
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vigil_server.models.base import Base, TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from vigil_server.models.project_settings import ProjectSettings
 
 
 def _generate_api_key() -> str:
@@ -23,6 +27,13 @@ class Project(UUIDMixin, TimestampMixin, Base):
     api_keys: Mapped[list[APIKey]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    settings: Mapped[ProjectSettings | None] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
         lazy="selectin",
     )
 
